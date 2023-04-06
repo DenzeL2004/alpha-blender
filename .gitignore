@@ -1,0 +1,4 @@
+run
+*.o
+README.md
+/temp
