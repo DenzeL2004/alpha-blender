@@ -11,28 +11,29 @@
 
 #include "alphaBlender.h"
 
-#include "configBMP.h"
+//==============================================================================
+static void CombineImage    (const Image_info *back_img, const Image_info *front_img, 
+                             const Image_info *result_img,
+                             const uint32_t x_start, const uint32_t y_start);
+
+static char *LoadImage      (const char *file_name, 
+                             uint32_t *width, uint32_t *hight);
+
+static void PrintFPS        (sf::RenderWindow *window, sf::Clock *fps_time, size_t *frame_cnt);
+
+static void DrawImage       (const Image_info *result_img, sf::Image *img);
+
+static void SaveImage       (const char *result_file_name, const sf::Image *result_img);
+
 
 //==============================================================================
 
-static void CombineImage(const Image_info *back_img, const Image_info *front_img, 
-                                                     const Image_info *result_img);
-
-static char *LoadImage(const int fdin, const off_t offset);
-
-static void PrintFPS(sf::RenderWindow *window, sf::Clock *fps_time, size_t *frame_cnt);
-
-static void DisplayResult(sf::RenderWindow *window, const Image_info *result_img);
-
-
-static int GetParamBMP (const int fdin, uint32_t *width, uint32_t *hight, off_t *data_offset);
-
-//==============================================================================
-
-int AlphaBlending(const char *back_img_name, const char *front_img_name)
+int AlphaBlending(const char *back_img_name, const char *front_img_name, const char *result_img_name, 
+                    const uint32_t x_start, const uint32_t y_start)
 {
-    assert(back_img_name != nullptr && "back_img_name is nullptr");
-    assert(front_img_name != nullptr && "front_img_name is nullptr");
+    assert(back_img_name   != nullptr && "back_img_name is nullptr");
+    assert(front_img_name  != nullptr && "front_img_name is nullptr");
+    assert(result_img_name != nullptr && "result_img_name is nullptr");
 
     Image_info back_img = {};
     if (ImagInfoCtor(&back_img, back_img_name))
@@ -46,7 +47,11 @@ int AlphaBlending(const char *back_img_name, const char *front_img_name)
     if (ImagInfoCtor(&result_img, back_img_name))
         return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load background picture from file failed\n");
 
-    sf::RenderWindow window(sf::VideoMode(Window_width, Window_hight), "Mandelbrot");
+    sf::RenderWindow window(sf::VideoMode(back_img.width, back_img.hight), "Blending");
+
+
+    sf::Image img = {};
+    img.create(result_img.width, result_img.hight, sf::Color::Black);
 
     size_t frame_cnt = 0;
     sf::Clock fps_time;
@@ -68,10 +73,12 @@ int AlphaBlending(const char *back_img_name, const char *front_img_name)
             usleep(Delay);
         }
 
+        CombineImage(&back_img, &front_img, &result_img, x_start, y_start);
+
         if (flag_draw_img)
         {
-            CombineImage(&back_img, &front_img, &result_img);
-            DisplayResult(&window, &result_img);
+            DrawImage(&result_img, &img);
+            DisplayImage(&window, &img);
         }
         else
         {
@@ -81,6 +88,9 @@ int AlphaBlending(const char *back_img_name, const char *front_img_name)
 
         PrintFPS(&window, &fps_time, &frame_cnt);
     }
+
+    SaveImage(result_img_name, &img);
+
 
     ImagInfoDtor(&back_img);
     ImagInfoDtor(&front_img);
@@ -92,14 +102,15 @@ int AlphaBlending(const char *back_img_name, const char *front_img_name)
 //===============================================================================
 
 static void CombineImage(const Image_info *back_img, const Image_info *front_img, 
-                                                     const Image_info *result_img)
+                                                     const Image_info *result_img,
+                         const uint32_t x_start, const uint32_t y_start)
 {
     assert(back_img != nullptr && "back_img is nullptr");
     assert(front_img != nullptr && "front_img is nullptr");
 
     assert(result_img != nullptr && "result_img is nullptr");
 
-    memcpy(result_img->pixel_data, back_img->pixel_data, back_img->hight * back_img->width * DWORD);
+    //memcpy(result_img->pixel_data, back_img->pixel_data, back_img->hight * back_img->width * DWORD);
 
     RGB_Quad back_pixel = {}, front_pixel = {};
 
@@ -107,7 +118,7 @@ static void CombineImage(const Image_info *back_img, const Image_info *front_img
     {
         for (uint32_t xi = 0; xi < front_img->width; xi++)
         {
-            size_t back_it  = (yi * back_img->width  + xi) * DWORD;
+            size_t back_it  = ((yi + y_start) * back_img->width  + (xi + x_start)) * DWORD;
             size_t front_it = (yi * front_img->width + xi) * DWORD;
 
             memcpy(&back_pixel,  back_img->pixel_data  + back_it,  DWORD);
@@ -120,7 +131,7 @@ static void CombineImage(const Image_info *back_img, const Image_info *front_img
             front_pixel.rgbBlue  = (uint8_t) ((alpha * front_pixel.rgbBlue  + (255 - alpha) * back_pixel.rgbBlue ) >> 8);
             front_pixel.rgbRed   = (uint8_t) ((alpha * front_pixel.rgbRed   + (255 - alpha) * back_pixel.rgbRed  ) >> 8);
 
-            memcpy(result_img->pixel_data + back_it, &front_pixel, 4);
+            memcpy(result_img->pixel_data + back_it, &front_pixel, DWORD);
         }
     }
 
@@ -129,13 +140,10 @@ static void CombineImage(const Image_info *back_img, const Image_info *front_img
 
 //===============================================================================
 
-static void DisplayResult(sf::RenderWindow *window, const Image_info *result_img)
+static void DrawImage(const Image_info *result_img, sf::Image *img)
 {
     assert(result_img != nullptr && "front_buf is nullptr");
-    assert(window != nullptr && "window is nullptr");
-
-    sf::Image img = {};
-    img.create(Window_width, Window_hight, sf::Color::Green);
+    assert(img        != nullptr && "img is nullptr");
 
     size_t it = 0;
 
@@ -143,21 +151,13 @@ static void DisplayResult(sf::RenderWindow *window, const Image_info *result_img
     {
         for (uint32_t xi = 0; xi < result_img->width; xi++)
         {
-            uint32_t x = Window_width - xi - 1;
-            uint32_t y = Window_hight - yi - 1;
-            img.setPixel(x, y, sf::Color(   result_img->pixel_data[it + 2], 
-                                            result_img->pixel_data[it + 1], 
-                                            result_img->pixel_data[it + 0],
-                                            result_img->pixel_data[it + 3]));
-
-            //printf("%x %x %x %x\n", result_buf[it + 0], result_buf[it + 1], result_buf[it + 2], result_buf[it + 3]);
-            //    usleep(Delay * 10);
-
+            (*img).setPixel(xi, yi, sf::Color(  result_img->pixel_data[it + 0], 
+                                                result_img->pixel_data[it + 1], 
+                                                result_img->pixel_data[it + 2],
+                                                result_img->pixel_data[it + 3]));
             it += 4;
         }
     }
-
-    DisplayImage(window, &img);
 
     return;
 }
@@ -176,53 +176,16 @@ int ImagInfoCtor (Image_info *img_str, const char *file_name)
     
     img_str->hight       = 0;
     img_str->width       = 0;
-    img_str->data_offset = 0;
-
-    if (GetParamBMP(fdin, &img_str->width, &img_str->hight,  &img_str->data_offset))
-        return PROCESS_ERROR(IMAGE_INFO_CTOR_ERR, "Get param from bmp file failed");
 
 
-    img_str->pixel_data = LoadImage(fdin, img_str->data_offset);
+    img_str->pixel_data = LoadImage(file_name, &img_str->width, &img_str->hight);
     if (CheckNullptr(img_str->pixel_data))
-        return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load background picture from file failed\n");
-
-
-    if (CloseFileDescriptor(fdin))
-        return PROCESS_ERROR(IMAGE_INFO_CTOR_ERR, "close file \'%s\' discriptor = %d failed\n",
-                                                            file_name,          fdin);
-    return 0;
-}
-
-//===============================================================================
-
-static int GetParamBMP(const int fdin, 
-                       uint32_t *width, uint32_t *hight, off_t *data_offset)
-{
-    assert(fdin >= 0 && "file descriptor isn't positive number");
-
-    assert(width        !=  nullptr && "width is nullptr");
-    assert(hight        !=  nullptr && "highr is nullptr");
-    assert(data_offset  !=  nullptr && "data_offset is nullptr");
-
-    size_t read_num = 0;
-
-    read_num = pread(fdin, width, DWORD, Offset_width);
-    if (read_num != DWORD)
-        return PROCESS_ERROR(GET_PARAM_BMP_ERR, "read width file failed. Was readden %lu", read_num);
-
-    read_num = pread(fdin, hight, DWORD, Offset_hight);
-    if (read_num != DWORD)
-        return PROCESS_ERROR(GET_PARAM_BMP_ERR, "read hight file failed. Was readden %lu", read_num);
-
-    read_num = pread(fdin, data_offset, DWORD, Offset_data);
-    if (read_num != DWORD)
-        return PROCESS_ERROR(GET_PARAM_BMP_ERR, "read data offset file failed. Was readden %lu", read_num);
+        return PROCESS_ERROR(IMAGE_INFO_CTOR_ERR, "Load picture from file \'%s\' failed\n", file_name);
 
     return 0;
 }
 
 //===============================================================================
-
 
 int ImagInfoDtor(Image_info *img_str)
 {
@@ -230,7 +193,6 @@ int ImagInfoDtor(Image_info *img_str)
 
     img_str->hight       = 0;
     img_str->width       = 0;
-    img_str->data_offset = 0;
 
     free (img_str->pixel_data);
 
@@ -239,32 +201,45 @@ int ImagInfoDtor(Image_info *img_str)
 
 //===============================================================================
 
-static char *LoadImage(const int fdin, const off_t offset)
+static char *LoadImage( const char *file_name, 
+                        uint32_t *width, uint32_t *hight)
 {
-    assert(fdin >= 0 && "file descriptor isn't positive number");
+    assert(file_name != nullptr && "file name is nullptr");
 
-    struct stat file_info = {};
-    fstat(fdin, &file_info);
+    sf::Image img = {};
+    img.loadFromFile(file_name);
 
-    size_t img_size = file_info.st_size - offset;
+    sf::Vector2u img_size = img.getSize();
 
-    char *buffer = (char*)CreateAlignedBuffer(32, img_size);
+    *width = img_size.x;
+    *hight = img_size.y;
+
+    uint32_t size = (*width) * (*hight) * DWORD;
+
+    char *buffer = (char*)CreateAlignedBuffer(32, size);
     if (CheckNullptr(buffer))
     {
-        PROCESS_ERROR(ERR_FILE_OPEN, "allocate memory to file discriptor = %d failed\n", fdin);
+        PROCESS_ERROR(ERR_FILE_OPEN, "allocate memory to file \'%s\' failed\n", file_name);
         return nullptr;
     }
 
-    size_t read_num = pread(fdin, buffer, img_size, offset);
-    if (read_num != img_size)
-    {
-        PROCESS_ERROR(ERR_FILE_OPEN,    "read from file failed.\n",
-                                        "was readen %lu, must %lu",
-                                        read_num, img_size);
-        return nullptr;
-    }
+    memcpy(buffer, img.getPixelsPtr(), size);
 
     return buffer;
+}
+
+
+//===============================================================================
+
+static void SaveImage(const char *result_file_name, const sf::Image *result_img)
+{
+    assert(result_file_name != nullptr && "file name is nullptr");
+    assert(result_img != nullptr && "result_img is nullptr");
+
+    open(result_file_name, O_WRONLY);
+    (*result_img).saveToFile(result_file_name);
+
+    return;
 }
 
 //===============================================================================

@@ -30,7 +30,7 @@ float GetFPS (sf::Clock *fps_time, size_t *frame_cnt)
 
     *frame_cnt += 1;
 
-    float cur_time = (*fps_time).getElapsedTime().asSeconds();
+    float cur_time = fps_time->getElapsedTime().asSeconds();
     float fps = (float)(*frame_cnt) / (cur_time);
 
     if (cur_time > 1.f || *frame_cnt == SIZE_MAX)

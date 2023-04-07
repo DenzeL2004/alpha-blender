@@ -13,7 +13,7 @@ int main ()
             return OPEN_FILE_LOG_ERR;
     #endif
 
-    AlphaBlending("src/img/circle.bmp", "src/img/lAskhatCat.bmp");
+    AlphaBlending("src/img/Table.bmp", "src/img/AskhatCat.bmp", "src/img/result.bmp", 300, 200);
 
     #ifdef USE_LOG
         if (CloseLogsFile ())

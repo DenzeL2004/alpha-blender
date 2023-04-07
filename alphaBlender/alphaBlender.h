@@ -8,15 +8,9 @@
 
 //===============================================================================
 
+const size_t Accuracy = 1;
 
-
-const uint32_t Window_hight  = 600;
-const uint32_t Window_width  = 800;
-
-const size_t Accuracy = 100;
-
-const size_t Delay    = 100000;  
-
+const size_t Delay    = 200000;  
 
 //===============================================================================
 
@@ -36,8 +30,6 @@ struct Image_info
 {
     uint32_t hight = 0;
     uint32_t width = 0;
-
-    off_t data_offset = 0;
 
     char *pixel_data  = nullptr;
 
@@ -61,8 +53,8 @@ enum Alpha_Blende_ERR
 
 //===============================================================================
 
-int AlphaBlending(const char *back_img_name, const char *front_img_name);
-
+int AlphaBlending(const char *back_img_name, const char *front_img_name, const char *result_img_name,
+                        const uint32_t x_start, const uint32_t y_start);
 
 int ImagInfoCtor(Image_info *img_str, const char *file_name);
 
