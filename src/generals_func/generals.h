@@ -38,6 +38,8 @@
                 #condition, __LINE__, __FILE__, __PRETTY_FUNCTION__);   \
 }
 
+#define BYTE 1
+
 const char RESET[]  =     "\033[0m";     ///< Standart colour
 const char RED[]    =  "\033[1;31m";     ///< Red colour
 const char BLUE[]   =  "\033[1;36m";     ///< Blue colour
@@ -142,6 +144,7 @@ int BinRepresent (FILE *fpout, size_t elem, uint64_t size_elem);
 int ClearData (unsigned char *cmd_hash_tabel, size_t size_data);
 
 uint64_t GetDataHash (const char *data, uint64_t len);
+
 
 /** 
  * @brief Paints a line

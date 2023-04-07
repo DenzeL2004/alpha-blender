@@ -11,15 +11,20 @@
 
 #include "alphaBlender.h"
 
+#include "configBMP.h"
+
 //==============================================================================
 
 static void CombineImage(const char *back_buf, const char *front_buf, char *result_buf);
 
-static char *LoadImage(const char *file_name, const off_t offset);
+static char *LoadImage(const int fdin, const off_t offset);
 
 static void PrintFPS(sf::RenderWindow *window, sf::Clock *fps_time, size_t *frame_cnt);
 
 static void DisplayResult(sf::RenderWindow *window, const char *result_buf);
+
+
+static int GetParamBMP (const int fdin, uint32_t *width, uint32_t *hight, off_t *data_offset);
 
 //==============================================================================
 
@@ -28,57 +33,57 @@ int AlphaBlending(const char *back_img_name, const char *front_img_name)
     assert(back_img_name != nullptr && "back_img_name is nullptr");
     assert(front_img_name != nullptr && "front_img_name is nullptr");
 
-    char *back_buf = LoadImage(back_img_name, 0x8a);
-    if (CheckNullptr(back_buf))
+    Image_info back_img = {};
+    if (ImagInfoCtor(&back_img, back_img_name))
         return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load background picture from file failed\n");
 
-    char *front_buf = LoadImage(front_img_name, 0x36);
-    if (CheckNullptr(front_buf))
-        return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load frontend picture from file failed\n");
+    // char *front_buf = LoadImage(front_img_name, 0x36);
+    // if (CheckNullptr(front_buf))
+    //     return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load frontend picture from file failed\n");
 
-    char *result_buf = CreateAlignedBuffer(32, Window_hight * Window_width * 4);
-    if (CheckNullptr(result_buf))
-        return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load frontend picture from file failed\n");
+    // char *result_buf = CreateAlignedBuffer(32, Window_hight * Window_width * 4);
+    // if (CheckNullptr(result_buf))
+    //     return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load frontend picture from file failed\n");
 
-    sf::RenderWindow window(sf::VideoMode(Window_width, Window_hight), "Mandelbrot");
+    // sf::RenderWindow window(sf::VideoMode(Window_width, Window_hight), "Mandelbrot");
 
-    size_t frame_cnt = 0;
-    sf::Clock fps_time;
+    // size_t frame_cnt = 0;
+    // sf::Clock fps_time;
 
-    int flag_draw_img = 1;
+    // int flag_draw_img = 1;
 
-    while (window.isOpen())
-    {
-        sf::Event event;
-        while (window.pollEvent(event))
-        {
-            if (event.type == sf::Event::Closed)
-                window.close();
-        }
+    // while (window.isOpen())
+    // {
+    //     sf::Event event;
+    //     while (window.pollEvent(event))
+    //     {
+    //         if (event.type == sf::Event::Closed)
+    //             window.close();
+    //     }
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::P))
-        {
-            flag_draw_img ^= 1;
-            usleep(Delay);
-        }
+    //     if (sf::Keyboard::isKeyPressed(sf::Keyboard::P))
+    //     {
+    //         flag_draw_img ^= 1;
+    //         usleep(Delay);
+    //     }
 
-        if (flag_draw_img)
-        {
-            CombineImage(back_buf, front_buf, result_buf);
-            DisplayResult(&window, result_buf);
-        }
-        else
-        {
-            window.clear();
-            window.display();
-        }
+    //     if (flag_draw_img)
+    //     {
+    //         CombineImage(back_buf, front_buf, result_buf);
+    //         DisplayResult(&window, result_buf);
+    //     }
+    //     else
+    //     {
+    //         window.clear();
+    //         window.display();
+    //     }
 
-        PrintFPS(&window, &fps_time, &frame_cnt);
-    }
+    //     PrintFPS(&window, &fps_time, &frame_cnt);
+    // }
 
-    free(back_buf);
-    free(front_buf);
-    free(result_buf);
+    // free(back_buf);
+    // free(front_buf);
+    // free(result_buf);
 
     return 0;
 }
@@ -157,17 +162,85 @@ static void DisplayResult(sf::RenderWindow *window, const char *result_buf)
 
 //===============================================================================
 
-static char *LoadImage(const char *file_name, const off_t offset)
+int ImagInfoCtor (Image_info *img_str, const char *file_name)
 {
-    assert(file_name != nullptr && "file_name is nullptr");
+    assert (img_str   != nullptr && "img_str is nullptr");
+    assert (file_name != nullptr && "img_str is nullptr");
 
     int fdin = OpenFileDescriptor(file_name, O_RDWR);
     if (fdin <= 0)
-    {
-        PROCESS_ERROR(ERR_FILE_OPEN, "open file \'%s\' discriptor = %d failed\n",
-                      file_name, fdin);
-        return nullptr;
-    }
+        return PROCESS_ERROR(IMAGE_INFO_CTOR_ERR, "open file \'%s\' discriptor = %d failed\n", 
+                                                            file_name,          fdin);
+    
+    img_str->hight       = 0;
+    img_str->width       = 0;
+    img_str->data_offset = 0;
+
+    if (GetParamBMP(fdin, &img_str->width, &img_str->hight,  &img_str->data_offset))
+        return PROCESS_ERROR(IMAGE_INFO_CTOR_ERR, "Get param from bmp file failed");
+
+
+    img_str->pixel_data = LoadImage(fdin, img_str->data_offset);
+    if (CheckNullptr(img_str->pixel_data))
+        return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load background picture from file failed\n");
+
+
+    if (CloseFileDescriptor(fdin))
+        return PROCESS_ERROR(IMAGE_INFO_CTOR_ERR, "close file \'%s\' discriptor = %d failed\n",
+                                                            file_name,          fdin);
+    return 0;
+}
+
+//===============================================================================
+
+static int GetParamBMP (const int fdin, 
+                 uint32_t *width, uint32_t *hight, off_t *data_offset)
+{
+    assert(fdin >= 0 && "file descriptor isn't positive number");
+
+    assert(width        !=  nullptr && "width is nullptr");
+    assert(hight        !=  nullptr && "highr is nullptr");
+    assert(data_offset  !=  nullptr && "data_offset is nullptr");
+
+    size_t read_num = 0;
+
+    read_num = pread(fdin, width, BYTE * 4, Offset_width);
+    if (read_num != BYTE * 4)
+        return PROCESS_ERROR(GET_PARAM_BMP_ERR, "read width file failed. Was readden %lu", read_num);
+
+    read_num = pread(fdin, hight, BYTE * 4, Offset_hight);
+    if (read_num != BYTE * 4)
+        return PROCESS_ERROR(GET_PARAM_BMP_ERR, "read hight file failed. Was readden %lu", read_num);
+
+    read_num = pread(fdin, data_offset, BYTE * 4, Offset_data);
+    if (read_num != BYTE * 4)
+        return PROCESS_ERROR(GET_PARAM_BMP_ERR, "read data offset file failed. Was readden %lu", read_num);
+
+    return 0;
+}
+
+//===============================================================================
+
+
+int ImagInfoDtor (Image_info *img_str)
+{
+    assert (img_str   != nullptr && "img_str is nullptr");
+
+    
+    img_str->hight       = 0;
+    img_str->width       = 0;
+    img_str->data_offset = 0;
+
+    free (img_str->pixel_data);
+
+    return 0;
+}
+
+//===============================================================================
+
+static char *LoadImage(const int fdin, const off_t offset)
+{
+    assert(fdin >= 0 && "file descriptor isn't positive number");
 
     struct stat file_info = {};
     fstat(fdin, &file_info);
@@ -177,24 +250,16 @@ static char *LoadImage(const char *file_name, const off_t offset)
     char *buffer = (char*)CreateAlignedBuffer(32, img_size);
     if (CheckNullptr(buffer))
     {
-        PROCESS_ERROR(ERR_FILE_OPEN, "allocate memory to file \'%s\' discriptor = %d failed\n",
-                      file_name, fdin);
+        PROCESS_ERROR(ERR_FILE_OPEN, "allocate memory to file discriptor = %d failed\n", fdin);
         return nullptr;
     }
 
     size_t read_num = pread(fdin, buffer, img_size, offset);
     if (read_num != img_size)
     {
-        PROCESS_ERROR(ERR_FILE_OPEN, "read from file \'%s\'failed.\n",
-                      "was readen %lu, must %lu",
-                      file_name, read_num, img_size);
-        return nullptr;
-    }
-
-    if (CloseFileDescriptor(fdin))
-    {
-        PROCESS_ERROR(ERR_FILE_CLOSE, "close file \'%s\' discriptor = %d failed\n",
-                      file_name, fdin);
+        PROCESS_ERROR(ERR_FILE_OPEN,    "read from file failed.\n",
+                                        "was readen %lu, must %lu",
+                                        read_num, img_size);
         return nullptr;
     }
 
