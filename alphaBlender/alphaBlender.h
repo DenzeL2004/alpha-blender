@@ -61,13 +61,13 @@ enum Alpha_Blende_ERR
 
 //===============================================================================
 
-
-//===============================================================================
-
 int AlphaBlending(const char *back_img_name, const char *front_img_name);
 
 
-int ImagInfoCtor (Image_info *img_str, const char *file_name);
+int ImagInfoCtor(Image_info *img_str, const char *file_name);
+
+
+int ImagInfoDtor(Image_info *img_str);
 
 //===============================================================================
 

@@ -39,6 +39,7 @@
 }
 
 #define BYTE 1
+#define DWORD 4
 
 const char RESET[]  =     "\033[0m";     ///< Standart colour
 const char RED[]    =  "\033[1;31m";     ///< Red colour

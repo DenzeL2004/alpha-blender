@@ -15,13 +15,14 @@
 
 //==============================================================================
 
-static void CombineImage(const char *back_buf, const char *front_buf, char *result_buf);
+static void CombineImage(const Image_info *back_img, const Image_info *front_img, 
+                                                     const Image_info *result_img);
 
 static char *LoadImage(const int fdin, const off_t offset);
 
 static void PrintFPS(sf::RenderWindow *window, sf::Clock *fps_time, size_t *frame_cnt);
 
-static void DisplayResult(sf::RenderWindow *window, const char *result_buf);
+static void DisplayResult(sf::RenderWindow *window, const Image_info *result_img);
 
 
 static int GetParamBMP (const int fdin, uint32_t *width, uint32_t *hight, off_t *data_offset);
@@ -37,79 +38,80 @@ int AlphaBlending(const char *back_img_name, const char *front_img_name)
     if (ImagInfoCtor(&back_img, back_img_name))
         return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load background picture from file failed\n");
 
-    // char *front_buf = LoadImage(front_img_name, 0x36);
-    // if (CheckNullptr(front_buf))
-    //     return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load frontend picture from file failed\n");
+    Image_info front_img = {};
+    if (ImagInfoCtor(&front_img, front_img_name))
+        return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load front picture from file failed\n");
 
-    // char *result_buf = CreateAlignedBuffer(32, Window_hight * Window_width * 4);
-    // if (CheckNullptr(result_buf))
-    //     return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load frontend picture from file failed\n");
+    Image_info result_img = {};
+    if (ImagInfoCtor(&result_img, back_img_name))
+        return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load background picture from file failed\n");
 
-    // sf::RenderWindow window(sf::VideoMode(Window_width, Window_hight), "Mandelbrot");
+    sf::RenderWindow window(sf::VideoMode(Window_width, Window_hight), "Mandelbrot");
 
-    // size_t frame_cnt = 0;
-    // sf::Clock fps_time;
+    size_t frame_cnt = 0;
+    sf::Clock fps_time;
 
-    // int flag_draw_img = 1;
+    int flag_draw_img = 1;
 
-    // while (window.isOpen())
-    // {
-    //     sf::Event event;
-    //     while (window.pollEvent(event))
-    //     {
-    //         if (event.type == sf::Event::Closed)
-    //             window.close();
-    //     }
+    while (window.isOpen())
+    {
+        sf::Event event;
+        while (window.pollEvent(event))
+        {
+            if (event.type == sf::Event::Closed)
+                window.close();
+        }
 
-    //     if (sf::Keyboard::isKeyPressed(sf::Keyboard::P))
-    //     {
-    //         flag_draw_img ^= 1;
-    //         usleep(Delay);
-    //     }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::P))
+        {
+            flag_draw_img ^= 1;
+            usleep(Delay);
+        }
 
-    //     if (flag_draw_img)
-    //     {
-    //         CombineImage(back_buf, front_buf, result_buf);
-    //         DisplayResult(&window, result_buf);
-    //     }
-    //     else
-    //     {
-    //         window.clear();
-    //         window.display();
-    //     }
+        if (flag_draw_img)
+        {
+            CombineImage(&back_img, &front_img, &result_img);
+            DisplayResult(&window, &result_img);
+        }
+        else
+        {
+            window.clear();
+            window.display();
+        }
 
-    //     PrintFPS(&window, &fps_time, &frame_cnt);
-    // }
+        PrintFPS(&window, &fps_time, &frame_cnt);
+    }
 
-    // free(back_buf);
-    // free(front_buf);
-    // free(result_buf);
+    ImagInfoDtor(&back_img);
+    ImagInfoDtor(&front_img);
+    ImagInfoDtor(&result_img);
 
     return 0;
 }
 
 //===============================================================================
 
-static void CombineImage(const char *back_buf, const char *front_buf, char *result_buf)
+static void CombineImage(const Image_info *back_img, const Image_info *front_img, 
+                                                     const Image_info *result_img)
 {
-    assert(back_buf != nullptr && "back_buf is nullptr");
-    assert(front_buf != nullptr && "front_buf is nullptr");
+    assert(back_img != nullptr && "back_img is nullptr");
+    assert(front_img != nullptr && "front_img is nullptr");
 
-    assert(result_buf != nullptr && "result_buf is nullptr");
+    assert(result_img != nullptr && "result_img is nullptr");
 
-    memcpy(result_buf, back_buf, Window_hight * Window_width * 4);
+    memcpy(result_img->pixel_data, back_img->pixel_data, back_img->hight * back_img->width * DWORD);
 
     RGB_Quad back_pixel = {}, front_pixel = {};
 
-    for (uint32_t yi = 0; yi < 126; yi++)
+    for (uint32_t yi = 0; yi < front_img->hight; yi++)
     {
-        for (uint32_t xi = 0; xi < 235; xi++)
+        for (uint32_t xi = 0; xi < front_img->width; xi++)
         {
-            size_t back_it  = (yi * Window_width + xi) * 4;
-            size_t front_it = (yi * 235 + xi) * 4;
+            size_t back_it  = (yi * back_img->width  + xi) * DWORD;
+            size_t front_it = (yi * front_img->width + xi) * DWORD;
 
-            memcpy(&back_pixel,  back_buf  + back_it, 4);
-            memcpy(&front_pixel, front_buf + front_it, 4);
+            memcpy(&back_pixel,  back_img->pixel_data  + back_it,  DWORD);
+            memcpy(&front_pixel, front_img->pixel_data + front_it, DWORD);
 
             uint8_t alpha = front_pixel.rgbAlpha;
 
@@ -118,7 +120,7 @@ static void CombineImage(const char *back_buf, const char *front_buf, char *resu
             front_pixel.rgbBlue  = (uint8_t) ((alpha * front_pixel.rgbBlue  + (255 - alpha) * back_pixel.rgbBlue ) >> 8);
             front_pixel.rgbRed   = (uint8_t) ((alpha * front_pixel.rgbRed   + (255 - alpha) * back_pixel.rgbRed  ) >> 8);
 
-            memcpy(result_buf + back_it, &front_pixel, 4);
+            memcpy(result_img->pixel_data + back_it, &front_pixel, 4);
         }
     }
 
@@ -127,9 +129,9 @@ static void CombineImage(const char *back_buf, const char *front_buf, char *resu
 
 //===============================================================================
 
-static void DisplayResult(sf::RenderWindow *window, const char *result_buf)
+static void DisplayResult(sf::RenderWindow *window, const Image_info *result_img)
 {
-    assert(result_buf != nullptr && "front_buf is nullptr");
+    assert(result_img != nullptr && "front_buf is nullptr");
     assert(window != nullptr && "window is nullptr");
 
     sf::Image img = {};
@@ -137,16 +139,16 @@ static void DisplayResult(sf::RenderWindow *window, const char *result_buf)
 
     size_t it = 0;
 
-    for (uint32_t yi = 0; yi < Window_hight; yi++)
+    for (uint32_t yi = 0; yi < result_img->hight; yi++)
     {
-        for (uint32_t xi = 0; xi < Window_width; xi++)
+        for (uint32_t xi = 0; xi < result_img->width; xi++)
         {
             uint32_t x = Window_width - xi - 1;
             uint32_t y = Window_hight - yi - 1;
-            img.setPixel(x, y, sf::Color(   result_buf[it + 2], 
-                                            result_buf[it + 1], 
-                                            result_buf[it + 0],
-                                            result_buf[it + 3]));
+            img.setPixel(x, y, sf::Color(   result_img->pixel_data[it + 2], 
+                                            result_img->pixel_data[it + 1], 
+                                            result_img->pixel_data[it + 0],
+                                            result_img->pixel_data[it + 3]));
 
             //printf("%x %x %x %x\n", result_buf[it + 0], result_buf[it + 1], result_buf[it + 2], result_buf[it + 3]);
             //    usleep(Delay * 10);
@@ -193,8 +195,8 @@ int ImagInfoCtor (Image_info *img_str, const char *file_name)
 
 //===============================================================================
 
-static int GetParamBMP (const int fdin, 
-                 uint32_t *width, uint32_t *hight, off_t *data_offset)
+static int GetParamBMP(const int fdin, 
+                       uint32_t *width, uint32_t *hight, off_t *data_offset)
 {
     assert(fdin >= 0 && "file descriptor isn't positive number");
 
@@ -204,16 +206,16 @@ static int GetParamBMP (const int fdin,
 
     size_t read_num = 0;
 
-    read_num = pread(fdin, width, BYTE * 4, Offset_width);
-    if (read_num != BYTE * 4)
+    read_num = pread(fdin, width, DWORD, Offset_width);
+    if (read_num != DWORD)
         return PROCESS_ERROR(GET_PARAM_BMP_ERR, "read width file failed. Was readden %lu", read_num);
 
-    read_num = pread(fdin, hight, BYTE * 4, Offset_hight);
-    if (read_num != BYTE * 4)
+    read_num = pread(fdin, hight, DWORD, Offset_hight);
+    if (read_num != DWORD)
         return PROCESS_ERROR(GET_PARAM_BMP_ERR, "read hight file failed. Was readden %lu", read_num);
 
-    read_num = pread(fdin, data_offset, BYTE * 4, Offset_data);
-    if (read_num != BYTE * 4)
+    read_num = pread(fdin, data_offset, DWORD, Offset_data);
+    if (read_num != DWORD)
         return PROCESS_ERROR(GET_PARAM_BMP_ERR, "read data offset file failed. Was readden %lu", read_num);
 
     return 0;
@@ -222,11 +224,10 @@ static int GetParamBMP (const int fdin,
 //===============================================================================
 
 
-int ImagInfoDtor (Image_info *img_str)
+int ImagInfoDtor(Image_info *img_str)
 {
     assert (img_str   != nullptr && "img_str is nullptr");
 
-    
     img_str->hight       = 0;
     img_str->width       = 0;
     img_str->data_offset = 0;
