@@ -5,7 +5,7 @@
 
 //===========================================================================================
 
-void DrawImage (sf::RenderWindow *window, const sf::Image *img)
+void DisplayImage (sf::RenderWindow *window, const sf::Image *img)
 {
     assert (window != nullptr && "window is nullptr");
 
@@ -23,10 +23,10 @@ void DrawImage (sf::RenderWindow *window, const sf::Image *img)
 
 //===========================================================================================
  
-float GetFPS (sf::RenderWindow *window, sf::Clock *fps_time, size_t *frame_cnt)
+float GetFPS (sf::Clock *fps_time, size_t *frame_cnt)
 {
-    assert (window      != nullptr && "window is nullptr");
     assert (fps_time    != nullptr && "fps_time is nullptr");
+    assert (frame_cnt   != nullptr && "frame_cnt is nullptr");
 
     *frame_cnt += 1;
 

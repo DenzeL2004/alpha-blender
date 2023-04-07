@@ -143,7 +143,6 @@ int ClearData (unsigned char *cmd_hash_tabel, size_t size_data);
 
 uint64_t GetDataHash (const char *data, uint64_t len);
 
-
 /** 
  * @brief Paints a line
  * @version 1.0.0
@@ -151,7 +150,6 @@ uint64_t GetDataHash (const char *data, uint64_t len);
  * @param [in] str line to be colored
 */
 void PrintColour (char const colour[], char const *str, ...);
-
 
 /**
  * @brief Opens a file in a specific mode
@@ -188,5 +186,7 @@ int Factorial (int ord);
 char* CreateVirtualBuf (const int fdin, const int prot, const off_t offset);
 
 int FreeVirtualBuf (const int fdin, char *virtual_buf);
+
+char *CreateAlignedBuffer(const size_t alignment, const size_t size);
 
 #endif

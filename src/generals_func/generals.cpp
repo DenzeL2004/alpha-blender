@@ -309,3 +309,23 @@ int FreeVirtualBuf (const int fdin, char *virtual_buf)
 }
 
 //========================================================================================
+
+char *CreateAlignedBuffer(const size_t alignment, const size_t size)
+{
+	char *buffer = (char*) aligned_alloc(alignment, size);
+    if (CheckNullptr(buffer))
+    {
+        fprintf (stderr, "dynamic memory allocation by size = %lu, alignment = %lu- failed", 
+													   size,	   alignment);
+		return nullptr;
+    }
+
+    for (size_t id = 0; id < size; id++)
+	{
+        buffer[id] = 0;
+	}
+
+	return buffer;
+}
+
+//========================================================================================

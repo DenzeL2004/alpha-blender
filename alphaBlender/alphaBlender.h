@@ -37,11 +37,22 @@ enum Alpha_Blende_ERR
 
 struct RGB_Quad
 {
-    uint8_t rgbBlue         = 0;
-    uint8_t rgbGreen        = 0;
-    uint8_t rgbRed          = 0;
+    uint8_t rgbBlue    = 0;
+    uint8_t rgbGreen   = 0;
+    uint8_t rgbRed     = 0;
 
-    uint8_t rgbBrightness   = 0;
+    uint8_t rgbAlpha   = 0;
+
+};
+
+//===============================================================================
+
+struct Image_info
+{
+    uint32_t hight = 0;
+    uint32_t width = 0;
+
+    char *pixel_data = nullptr;
 
 };
 

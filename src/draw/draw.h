@@ -7,9 +7,9 @@ const size_t Buffer_size = 100;
 
 //==================================================================================================
 
-void DrawImage (sf::RenderWindow *window, const sf::Image *img);
+void DisplayImage (sf::RenderWindow *window, const sf::Image *img);
 
-float GetFPS (sf::RenderWindow *window, sf::Clock *fps_time, size_t *frame_cnt);
+float GetFPS (sf::Clock *fps_time, size_t *frame_cnt);
 
 //==================================================================================================
 
