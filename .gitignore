@@ -2,3 +2,7 @@ run
 *.o
 README.md
 /temp
+src/img/res.bmp
+.gitignore
+src/img/result.bmp
+src/img/result.bmp

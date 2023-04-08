@@ -13,7 +13,7 @@ run: 	 obj/generals.o obj/log_errors.o obj/alphaBlender.o obj/main.o obj/draw.o
 	g++  obj/generals.o obj/log_errors.o obj/alphaBlender.o obj/main.o obj/draw.o -o run  $(SFML_FLAGS)
 
 
-obj/main.o: main.cpp
+obj/main.o: main.cpp config.h
 		g++ main.cpp -c -o obj/main.o $(FLAGS)
 
 

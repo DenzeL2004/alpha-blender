@@ -9,12 +9,14 @@
 #include "../src/generals_func/generals.h"
 #include "../src/draw/draw.h"
 
+#include "../config.h"
+
 #include "alphaBlender.h"
 
 //==============================================================================
 static void CombineImage    (const Image_info *back_img, const Image_info *front_img, 
                              const Image_info *result_img,
-                             const uint32_t x_start, const uint32_t y_start);
+                             uint32_t x_start, uint32_t y_start);
 
 static char *LoadImage      (const char *file_name, 
                              uint32_t *width, uint32_t *hight);
@@ -26,9 +28,13 @@ static void DrawImage       (const Image_info *result_img, sf::Image *img);
 static void SaveImage       (const char *result_file_name, const sf::Image *result_img);
 
 
+static int NormolizeSize    (Image_info *img_str);
+
+
 //==============================================================================
 
-int AlphaBlending(const char *back_img_name, const char *front_img_name, const char *result_img_name, 
+int AlphaBlending(  const char *back_img_name, const char *front_img_name, 
+                    const char *result_img_name, 
                     const uint32_t x_start, const uint32_t y_start)
 {
     assert(back_img_name   != nullptr && "back_img_name is nullptr");
@@ -103,14 +109,79 @@ int AlphaBlending(const char *back_img_name, const char *front_img_name, const c
 
 static void CombineImage(const Image_info *back_img, const Image_info *front_img, 
                                                      const Image_info *result_img,
-                         const uint32_t x_start, const uint32_t y_start)
+                         uint32_t x_start, uint32_t y_start)
 {
     assert(back_img != nullptr && "back_img is nullptr");
     assert(front_img != nullptr && "front_img is nullptr");
 
     assert(result_img != nullptr && "result_img is nullptr");
+   
+    #ifdef OPTIMIZE
 
-    //memcpy(result_img->pixel_data, back_img->pixel_data, back_img->hight * back_img->width * DWORD);
+    x_start = (x_start / 32) * 32;
+
+    const uint8_t Zero = 255u;
+    const uint8_t One  = 255u;
+
+    for (uint32_t yi = 0; yi < front_img->hight; yi++)
+    {
+        size_t back_it  = ((yi + y_start) * back_img->width + x_start) * DWORD;
+        size_t front_it = (yi * front_img->width) * DWORD;
+
+        for (uint32_t xi = 0; xi < front_img->width; xi += 8, back_it += 32, front_it += 32)
+        {
+            //load current eight pixel
+            __m256i front = _mm256_load_si256((__m256i*) (front_img->pixel_data + front_it));
+            __m256i back  = _mm256_load_si256((__m256i*) (back_img->pixel_data  + back_it));
+
+            //separate high and low bytes
+            __m256i front_l = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(front, 1));;
+            __m256i front_h = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(front, 0));
+
+            __m256i back_l = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(back, 1));
+            __m256i back_h = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(back, 0));
+
+
+            //Get alpha for each pixel
+            __m256i move_mask = _mm256_set_epi8(Zero, 14, Zero, 14, Zero, 14, Zero, 14,  
+                                                Zero,  6, Zero,  6, Zero,  6, Zero,  6,
+                                                Zero, 14, Zero, 14, Zero, 14, Zero, 14,  
+                                                Zero,  6, Zero,  6, Zero,  6, Zero,  6);
+
+            __m256i alpha_l = _mm256_shuffle_epi8(front_l, move_mask);
+            __m256i alpha_h = _mm256_shuffle_epi8(front_h, move_mask);
+
+            //front * alpha
+            front_l = _mm256_mullo_epi16(front_l, alpha_l);
+            front_h = _mm256_mullo_epi16(front_h, alpha_h);
+
+            //back * (255 - alpha)
+            back_l = _mm256_mullo_epi16(back_l, _mm256_subs_epu16(_mm256_set1_epi16(One), alpha_l));
+            back_h = _mm256_mullo_epi16(back_h, _mm256_subs_epu16(_mm256_set1_epi16(One), alpha_h));
+
+            //back + front
+            __m256i sum_l = _mm256_add_epi16(front_l, back_l);
+            __m256i sum_h = _mm256_add_epi16(front_h, back_h);
+
+            move_mask = _mm256_set_epi8(  15,   13,   11,    9,    7,    5,    3,    1, 
+                                        Zero, Zero, Zero, Zero, Zero, Zero, Zero, Zero,
+                                        Zero, Zero, Zero, Zero, Zero, Zero, Zero, Zero,   
+                                          15,   13,   11,    9,    7,    5,    3,    1);
+
+
+            sum_l = _mm256_shuffle_epi8(sum_l, move_mask);
+            sum_h = _mm256_shuffle_epi8(sum_h, move_mask);
+
+
+            __m256i colors = _mm256_set_m128i(  _mm_add_epi8(_mm256_extracti128_si256(sum_l, 0), _mm256_extracti128_si256(sum_l, 1)),
+                                                _mm_add_epi8(_mm256_extracti128_si256(sum_h, 0), _mm256_extracti128_si256(sum_h, 1)));
+            
+ 
+            _mm256_store_si256((__m256i*)(result_img->pixel_data + back_it), colors);
+        }
+    }
+
+    #else
 
     RGB_Quad back_pixel = {}, front_pixel = {};
 
@@ -135,6 +206,8 @@ static void CombineImage(const Image_info *back_img, const Image_info *front_img
         }
     }
 
+    #endif
+
     return;
 }
 
@@ -146,6 +219,7 @@ static void DrawImage(const Image_info *result_img, sf::Image *img)
     assert(img        != nullptr && "img is nullptr");
 
     size_t it = 0;
+ 
 
     for (uint32_t yi = 0; yi < result_img->hight; yi++)
     {
@@ -181,6 +255,49 @@ int ImagInfoCtor (Image_info *img_str, const char *file_name)
     img_str->pixel_data = LoadImage(file_name, &img_str->width, &img_str->hight);
     if (CheckNullptr(img_str->pixel_data))
         return PROCESS_ERROR(IMAGE_INFO_CTOR_ERR, "Load picture from file \'%s\' failed\n", file_name);
+
+    NormolizeSize(img_str);
+
+    return 0;
+}
+
+//===============================================================================
+
+static int NormolizeSize(Image_info *img_str)
+{
+    assert(img_str != nullptr && "img_str is nullptr");
+
+    uint32_t new_width = (img_str->width / 32 + 1) * 32;
+    uint32_t new_hight =  img_str->hight;
+
+    uint32_t size = new_width * new_hight * DWORD;
+
+    char *new_data = (char*)CreateAlignedBuffer(32, size);
+    if (CheckNullptr(new_data))
+        return PROCESS_ERROR(ERR_FILE_OPEN, "allocate memory failed\n");
+
+    size_t lowe_width = (img_str->width / 32) * 32;
+
+    for (size_t yi = 0; yi < img_str->hight; yi++)
+    {
+        size_t new_offset = yi * new_width      * DWORD;
+        size_t old_offset = yi * img_str->width * DWORD;
+
+        for (size_t xi = 0; xi < lowe_width; xi += 8, old_offset += 32, new_offset += 32)
+        {
+             __m256i data = _mm256_loadu_si256((__m256i*) (img_str->pixel_data + old_offset));
+            _mm256_storeu_si256((__m256i*) (new_data + new_offset), data); 
+        }   
+
+        size_t cnt = img_str->width % 32;
+        memcpy(new_data + new_offset, img_str->pixel_data + old_offset, cnt * DWORD);
+    }
+
+    free(img_str->pixel_data);
+    img_str->pixel_data = new_data;
+
+    img_str->width = new_width;
+    img_str->hight = new_hight;
 
     return 0;
 }
