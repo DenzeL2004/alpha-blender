@@ -321,8 +321,10 @@ char *CreateAlignedBuffer(const size_t alignment, const size_t size)
     }
 
     for (size_t id = 0; id < size; id++)
+	{
         buffer[id] = 0;
-
+	}
+	
 	return buffer;
 }
 

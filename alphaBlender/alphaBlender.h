@@ -1,5 +1,5 @@
-#ifndef _MANDELBROT_H_
-#define _MANDELBROT_H_
+#ifndef _ALPHABLENDER_H_
+#define _ALPHABLENDER_H_
 
 #include <stdint.h>
 #include <stddef.h>
@@ -7,8 +7,6 @@
 #include <immintrin.h>
 
 //===============================================================================
-
-const size_t Accuracy = 1;
 
 const size_t Delay    = 200000;  
 
@@ -31,6 +29,8 @@ struct Image_info
     uint32_t hight = 0;
     uint32_t width = 0;
 
+    uint32_t patch_width = 0;
+
     char *pixel_data  = nullptr;
 
 };
@@ -47,7 +47,7 @@ enum Alpha_Blende_ERR
     IMAGE_INFO_CTOR_ERR =   -3,
     IMAGE_INFO_DTOR_ERR =   -4,
 
-    GET_PARAM_BMP_ERR   =   -5,
+    SAVE_IMAGE_ERR      =   -5,
 
 };    
 

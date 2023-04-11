@@ -17,7 +17,7 @@ obj/main.o: main.cpp config.h
 		g++ main.cpp -c -o obj/main.o $(FLAGS)
 
 
-obj/alphaBlender.o: alphaBlender/alphaBlender.h alphaBlender/alphaBlender.cpp  
+obj/alphaBlender.o: config.h alphaBlender/alphaBlender.h alphaBlender/alphaBlender.cpp  
 				g++ alphaBlender/alphaBlender.cpp -c -o obj/alphaBlender.o -O2 -mavx2 -msse4 $(FLAGS)
 
 
