@@ -99,7 +99,7 @@ static float CombineImage(const Image_info *back_img, const Image_info *front_im
         x_start = (x_start / 32) * 32;
 
         const uint8_t Zero_mask = 255u;
-        const uint8_t One  = 255u;
+        const uint8_t Max_aplha = 255u;
 
         size_t back_it  = 0;
         size_t front_it = 0;
@@ -116,11 +116,11 @@ static float CombineImage(const Image_info *back_img, const Image_info *front_im
                 __m256i back  = _mm256_load_si256((__m256i*) (back_img->pixel_data  + back_it));
 
                 //separate high and low bytes
-                __m256i front_l = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(front, 1));;
-                __m256i front_h = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(front, 0));
+                __m256i back_l = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(back, 0));
+                __m256i back_h = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(back, 1));
 
-                __m256i back_l = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(back, 1));
-                __m256i back_h = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(back, 0));
+                __m256i front_l = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(front, 0));;
+                __m256i front_h = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(front, 1));
 
 
                 //Get alpha for each pixel
@@ -137,25 +137,38 @@ static float CombineImage(const Image_info *back_img, const Image_info *front_im
                 front_h = _mm256_mullo_epi16(front_h, alpha_h);
 
                 //back * (255 - alpha)
-                back_l = _mm256_mullo_epi16(back_l, _mm256_subs_epu16(_mm256_set1_epi16(One), alpha_l));
-                back_h = _mm256_mullo_epi16(back_h, _mm256_subs_epu16(_mm256_set1_epi16(One), alpha_h));
+                back_l = _mm256_mullo_epi16(back_l, _mm256_subs_epu16(_mm256_set1_epi16(Max_aplha), alpha_l));
+                back_h = _mm256_mullo_epi16(back_h, _mm256_subs_epu16(_mm256_set1_epi16(Max_aplha), alpha_h));
 
                 //back + front
                 __m256i sum_l = _mm256_add_epi16(front_l, back_l);
                 __m256i sum_h = _mm256_add_epi16(front_h, back_h);
 
-                move_mask = _mm256_set_epi8(  15,   13,   11,    9,    7,    5,    3,    1, 
+
+                move_mask = _mm256_set_epi8(15,   13,   11,    9,    7,    5,    3,    1, 
                                             Zero_mask, Zero_mask, Zero_mask, Zero_mask, Zero_mask, Zero_mask, Zero_mask, Zero_mask,
                                             Zero_mask, Zero_mask, Zero_mask, Zero_mask, Zero_mask, Zero_mask, Zero_mask, Zero_mask,   
                                             15,   13,   11,    9,    7,    5,    3,    1);
 
 
+                //index: | 31 | 30 | 29 | 28 | 27 | 26 | 25 | 24 | 23 | 22 | 21 | 20 | 19 | 18 | 17 | 16 |
+                //value: | a3 | r3 | g3 | b3 | a2 | r2 | g2 | b2 | 00 | 00 | 00 | 00 | 00 | 00 | 00 | 00 |
+
+                //index: | 15 | 14 | 13 | 12 | 11 | 10 | 09 | 08 | 07 | 06 | 05 | 04 | 03 | 02 | 01 | 00 |
+                //value: | 00 | 00 | 00 | 00 | 00 | 00 | 00 | 00 | a1 | r1 | g1 | b1 | a0 | r0 | g0 | b0 |
+
                 sum_l = _mm256_shuffle_epi8(sum_l, move_mask);
                 sum_h = _mm256_shuffle_epi8(sum_h, move_mask);
 
 
-                __m256i colors = _mm256_set_m128i(  _mm_add_epi8(_mm256_extracti128_si256(sum_l, 0), _mm256_extracti128_si256(sum_l, 1)),
-                                                    _mm_add_epi8(_mm256_extracti128_si256(sum_h, 0), _mm256_extracti128_si256(sum_h, 1)));
+                //index: | 15 | 14 | 13 | 12 | 11 | 10 | 09 | 08 | 07 | 06 | 05 | 04 | 03 | 02 | 01 | 00 |
+                //
+                //value: | a3 | r3 | g3 | b3 | a2 | r2 | g2 | b2 | 00 | 00 | 00 | 00 | 00 | 00 | 00 | 00 |
+                //      +        
+                //value: | 00 | 00 | 00 | 00 | 00 | 00 | 00 | 00 | a1 | r1 | g1 | b1 | a0 | r0 | g0 | b0 |
+                
+                __m256i colors = _mm256_set_m128i(  _mm_add_epi8(_mm256_extracti128_si256(sum_h, 1), _mm256_extracti128_si256(sum_h, 0)),
+                                                    _mm_add_epi8(_mm256_extracti128_si256(sum_l, 1), _mm256_extracti128_si256(sum_l, 0)));
                 
     
                 _mm256_store_si256((__m256i*)(result_img->pixel_data + back_it), colors);
