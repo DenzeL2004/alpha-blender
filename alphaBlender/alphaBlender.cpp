@@ -167,8 +167,8 @@ static float CombineImage(const Image_info *back_img, const Image_info *front_im
                 //      +        
                 //value: | 00 | 00 | 00 | 00 | 00 | 00 | 00 | 00 | a1 | r1 | g1 | b1 | a0 | r0 | g0 | b0 |
                 
-                __m256i colors = _mm256_set_m128i(  _mm_add_epi8(_mm256_extracti128_si256(sum_h, 1), _mm256_extracti128_si256(sum_h, 0)),
-                                                    _mm_add_epi8(_mm256_extracti128_si256(sum_l, 1), _mm256_extracti128_si256(sum_l, 0)));
+                __m256i colors = _mm256_set_m128i(  _mm_add_epi8(_mm256_extracti128_si256(sum_h, 0), _mm256_extracti128_si256(sum_h, 1)),
+                                                    _mm_add_epi8(_mm256_extracti128_si256(sum_l, 0), _mm256_extracti128_si256(sum_l, 1)));
                 
     
                 _mm256_store_si256((__m256i*)(result_img->pixel_data + back_it), colors);
