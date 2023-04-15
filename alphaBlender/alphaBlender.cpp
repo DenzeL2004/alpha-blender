@@ -43,9 +43,18 @@ int AlphaBlending(  const char *back_img_name, const char *front_img_name,
     if (ImagInfoCtor(&front_img, front_img_name))
         return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load front picture from file failed\n");
 
+    if ((front_img.width + x_start >= back_img.width) ||
+        (front_img.hight + y_start >= back_img.hight))
+    {
+        fprintf(stderr, "The coord of the beginning of the image rendering are set incorrectly\n");
+        return 0;
+    }
+
     Image_info result_img = {};
     if (ImagInfoCtor(&result_img, back_img_name))
         return PROCESS_ERROR(ALPHA_BLENDING_ERR, "Load background picture from file failed\n");
+
+    
 
     sf::RenderWindow window(sf::VideoMode(back_img.width, back_img.hight), "Blending");
 
@@ -119,7 +128,7 @@ static float CombineImage(const Image_info *back_img, const Image_info *front_im
                 __m256i back_l = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(back, 0));
                 __m256i back_h = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(back, 1));
 
-                __m256i front_l = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(front, 0));;
+                __m256i front_l = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(front, 0));
                 __m256i front_h = _mm256_cvtepu8_epi16(_mm256_extracti128_si256(front, 1));
 
 
