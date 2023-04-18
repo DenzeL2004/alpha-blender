@@ -163,6 +163,7 @@ static float CombineImage(const Image_info *back_img, const Image_info *front_im
                 //index: | 31 | 30 | 29 | 28 | 27 | 26 | 25 | 24 | 23 | 22 | 21 | 20 | 19 | 18 | 17 | 16 |
                 //value: | a3 | r3 | g3 | b3 | a2 | r2 | g2 | b2 | 00 | 00 | 00 | 00 | 00 | 00 | 00 | 00 |
 
+            
                 //index: | 15 | 14 | 13 | 12 | 11 | 10 | 09 | 08 | 07 | 06 | 05 | 04 | 03 | 02 | 01 | 00 |
                 //value: | 00 | 00 | 00 | 00 | 00 | 00 | 00 | 00 | a1 | r1 | g1 | b1 | a0 | r0 | g0 | b0 |
 
